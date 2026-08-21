@@ -6,203 +6,153 @@ import { useRouter } from "next/navigation";
 
 export default function BookAppointment() {
   const router = useRouter();
-  const supabase = createClient();
 
   const [doctorName, setDoctorName] = useState("");
   const [appointmentDate, setAppointmentDate] = useState("");
   const [appointmentTime, setAppointmentTime] = useState("");
   const [reason, setReason] = useState("");
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState("");
 
-  async function handleSubmit(e: React.FormEvent) {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!doctorName || !appointmentDate || !appointmentTime || !reason) {
+      alert("Please fill in all fields.");
+      return;
+    }
+
     setLoading(true);
-    setMessage("");
 
     try {
+      const supabase = createClient();
+
       const {
         data: { user },
+        error: userError,
       } = await supabase.auth.getUser();
 
-      if (!user) {
+      if (userError || !user) {
+        alert("Please login first.");
         router.push("/login");
         return;
       }
 
-      const { error } = await supabase
-        .from("appointments")
-        .insert({
+      const { error } = await supabase.from("appointments").insert([
+        {
           patient_id: user.id,
           doctor_name: doctorName,
           appointment_date: appointmentDate,
           appointment_time: appointmentTime,
           reason: reason,
-          status: "Pending",
-        });
+          status: "pending",
+        },
+      ]);
 
-      if (error) throw error;
+      if (error) {
+        console.error(error);
+        alert("Could not book appointment: " + error.message);
+        return;
+      }
 
-      setMessage("Appointment booked successfully!");
+      alert("Appointment booked successfully!");
 
       setDoctorName("");
       setAppointmentDate("");
       setAppointmentTime("");
       setReason("");
-    } catch (error: any) {
-      setMessage(error.message || "Failed to book appointment.");
+
+      router.push("/patient");
+    } catch (error) {
+      console.error(error);
+      alert("Something went wrong while booking the appointment.");
     } finally {
       setLoading(false);
     }
-  }
+  };
 
   return (
-    <main
-      style={{
-        minHeight: "100vh",
-        background: "#f5f7fb",
-        padding: "40px 20px",
-      }}
-    >
-      <div
-        style={{
-          maxWidth: "600px",
-          margin: "0 auto",
-          background: "white",
-          padding: "30px",
-          borderRadius: "12px",
-          boxShadow: "0 2px 10px rgba(0,0,0,0.08)",
-        }}
-      >
-        <button
-          onClick={() => router.push("/patient")}
-          style={{
-            padding: "10px 15px",
-            marginBottom: "20px",
-            cursor: "pointer",
-          }}
-        >
-          ← Dashboard
-        </button>
+    <div className="min-h-screen bg-gray-100 p-6">
+      <div className="max-w-2xl mx-auto">
+        <div className="bg-white rounded-lg shadow-md p-8">
+          <h1 className="text-3xl font-bold text-center mb-6">
+            Book Appointment
+          </h1>
 
-        <h1>Book an Appointment</h1>
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <div>
+              <label className="block font-medium mb-2">
+                Doctor Name
+              </label>
 
-        <p style={{ color: "#666" }}>
-          Enter your appointment details.
-        </p>
+              <input
+                type="text"
+                value={doctorName}
+                onChange={(e) => setDoctorName(e.target.value)}
+                placeholder="Enter doctor name"
+                className="w-full border rounded-lg px-4 py-2"
+              />
+            </div>
 
-        <form onSubmit={handleSubmit}>
-          <label>Doctor Name</label>
+            <div>
+              <label className="block font-medium mb-2">
+                Appointment Date
+              </label>
 
-          <input
-            type="text"
-            value={doctorName}
-            onChange={(e) => setDoctorName(e.target.value)}
-            placeholder="Enter doctor name"
-            required
-            style={{
-              width: "100%",
-              padding: "12px",
-              marginTop: "6px",
-              marginBottom: "18px",
-              border: "1px solid #ccc",
-              borderRadius: "8px",
-            }}
-          />
+              <input
+                type="date"
+                value={appointmentDate}
+                onChange={(e) => setAppointmentDate(e.target.value)}
+                className="w-full border rounded-lg px-4 py-2"
+              />
+            </div>
 
-          <label>Appointment Date</label>
+            <div>
+              <label className="block font-medium mb-2">
+                Appointment Time
+              </label>
 
-          <input
-            type="date"
-            value={appointmentDate}
-            onChange={(e) => setAppointmentDate(e.target.value)}
-            required
-            style={{
-              width: "100%",
-              padding: "12px",
-              marginTop: "6px",
-              marginBottom: "18px",
-              border: "1px solid #ccc",
-              borderRadius: "8px",
-            }}
-          />
+              <input
+                type="time"
+                value={appointmentTime}
+                onChange={(e) => setAppointmentTime(e.target.value)}
+                className="w-full border rounded-lg px-4 py-2"
+              />
+            </div>
 
-          <label>Appointment Time</label>
+            <div>
+              <label className="block font-medium mb-2">
+                Reason
+              </label>
 
-          <input
-            type="time"
-            value={appointmentTime}
-            onChange={(e) => setAppointmentTime(e.target.value)}
-            required
-            style={{
-              width: "100%",
-              padding: "12px",
-              marginTop: "6px",
-              marginBottom: "18px",
-              border: "1px solid #ccc",
-              borderRadius: "8px",
-            }}
-          />
+              <textarea
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                placeholder="Enter reason for appointment"
+                rows={4}
+                className="w-full border rounded-lg px-4 py-2"
+              />
+            </div>
 
-          <label>Reason for Visit</label>
+            <div className="flex gap-3">
+              <button
+                type="submit"
+                disabled={loading}
+                className="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              >
+                {loading ? "Booking..." : "Book Appointment"}
+              </button>
 
-          <textarea
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-            placeholder="Enter reason"
-            required
-            rows={4}
-            style={{
-              width: "100%",
-              padding: "12px",
-              marginTop: "6px",
-              marginBottom: "20px",
-              border: "1px solid #ccc",
-              borderRadius: "8px",
-            }}
-          />
-
-          <button
-            type="submit"
-            disabled={loading}
-            style={{
-              width: "100%",
-              padding: "13px",
-              border: "none",
-              borderRadius: "8px",
-              cursor: "pointer",
-              fontSize: "16px",
-            }}
-          >
-            {loading ? "Booking..." : "Book Appointment"}
-          </button>
-        </form>
-
-        {message && (
-          <p
-            style={{
-              marginTop: "20px",
-              padding: "12px",
-              background: "#f0f0f0",
-              borderRadius: "8px",
-            }}
-          >
-            {message}
-          </p>
-        )}
-
-        <button
-          onClick={() => router.push("/my-appointments")}
-          style={{
-            width: "100%",
-            marginTop: "15px",
-            padding: "12px",
-            cursor: "pointer",
-          }}
-        >
-          My Appointments
-        </button>
+              <button
+                type="button"
+                onClick={() => router.push("/patient")}
+                className="flex-1 bg-gray-500 text-white py-2 rounded-lg hover:bg-gray-600"
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
-    </main>
+    </div>
   );
 }
