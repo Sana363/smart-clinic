@@ -5,156 +5,169 @@ import { createClient } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 
 export default function DoctorDashboard() {
-  const supabase = createClient();
   const router = useRouter();
-
   const [appointments, setAppointments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  async function loadAppointments() {
-    const { data, error } = await supabase
-      .from("appointments")
-      .select("*")
-      .order("appointment_date", { ascending: true });
-
-    if (error) {
-      console.error("Error loading appointments:", error);
-      alert("Could not load appointments: " + error.message);
-      return;
-    }
-
-    setAppointments(data || []);
-    setLoading(false);
-  }
-
   useEffect(() => {
-    loadAppointments();
-  }, []);
+    const loadAppointments = async () => {
+      try {
+        const supabase = createClient();
 
-  async function updateStatus(id: string, status: string) {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+
+        if (!user) {
+          router.push("/login");
+          return;
+        }
+
+        const { data, error } = await supabase
+          .from("appointments")
+          .select("*")
+          .order("appointment_date", { ascending: true });
+
+        if (error) {
+          console.error(error);
+          return;
+        }
+
+        setAppointments(data || []);
+      } catch (error) {
+        console.error(error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadAppointments();
+  }, [router]);
+
+  const updateStatus = async (
+    id: string,
+    status: "approved" | "rejected"
+  ) => {
+    const supabase = createClient();
+
     const { error } = await supabase
       .from("appointments")
       .update({ status })
       .eq("id", id);
 
     if (error) {
-      console.error("Update error:", error);
-      alert("Could not update appointment: " + error.message);
+      alert(error.message);
       return;
     }
 
-    await loadAppointments();
-  }
+    setAppointments((current) =>
+      current.map((appointment) =>
+        appointment.id === id ? { ...appointment, status } : appointment
+      )
+    );
+  };
 
-  async function logout() {
+  const logout = async () => {
+    const supabase = createClient();
     await supabase.auth.signOut();
     router.push("/login");
-  }
+  };
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-slate-50 p-8">
-        <h1 className="text-3xl font-bold text-blue-600">
-          Doctor Dashboard
-        </h1>
-
-        <p className="mt-4">Loading appointments...</p>
-      </main>
+      <div className="min-h-screen flex items-center justify-center">
+        Loading...
+      </div>
     );
   }
 
   return (
-    <main className="min-h-screen bg-slate-50 p-8">
-      <div className="mx-auto max-w-5xl">
+    <div className="min-h-screen bg-gray-100 p-6">
+      <div className="max-w-6xl mx-auto">
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-3xl font-bold">Doctor Dashboard</h1>
 
-        {/* TOP BAR */}
-        <div className="mb-8 flex items-center justify-between rounded-2xl bg-white p-6 shadow">
-          
-          <div>
-            <h1 className="text-3xl font-bold text-blue-600">
-              Doctor Dashboard
-            </h1>
-
-            <p className="mt-2 text-slate-500">
-              Manage patient appointments
-            </p>
-          </div>
-
-          {/* LOGOUT */}
           <button
             onClick={logout}
-            className="rounded-lg bg-red-600 px-6 py-3 font-bold text-white hover:bg-red-700"
+            className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600"
           >
-            LOGOUT
+            Logout
           </button>
-
         </div>
 
-        {/* APPOINTMENTS */}
-        {appointments.length === 0 ? (
-          <div className="rounded-2xl bg-white p-6 shadow">
-            <p>No appointments found.</p>
-          </div>
-        ) : (
-          <div className="space-y-5">
-            {appointments.map((appointment) => (
-              <div
-                key={appointment.id}
-                className="rounded-2xl bg-white p-6 shadow"
-              >
-                <h2 className="mb-4 text-xl font-bold text-slate-800">
-                  Patient Appointment
-                </h2>
+        <div className="bg-white rounded-lg shadow p-6">
+          <h2 className="text-xl font-semibold mb-4">
+            Patient Appointments
+          </h2>
 
-                <p className="mb-2">
-                  <strong>Date:</strong>{" "}
-                  {appointment.appointment_date}
-                </p>
+          {appointments.length === 0 ? (
+            <p className="text-gray-600">No appointments found.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left p-3">Doctor</th>
+                    <th className="text-left p-3">Date</th>
+                    <th className="text-left p-3">Time</th>
+                    <th className="text-left p-3">Reason</th>
+                    <th className="text-left p-3">Status</th>
+                    <th className="text-left p-3">Action</th>
+                  </tr>
+                </thead>
 
-                <p className="mb-2">
-                  <strong>Time:</strong>{" "}
-                  {appointment.appointment_time}
-                </p>
+                <tbody>
+                  {appointments.map((appointment) => (
+                    <tr key={appointment.id} className="border-b">
+                      <td className="p-3">
+                        {appointment.doctor_name}
+                      </td>
 
-                <p className="mb-2">
-                  <strong>Reason:</strong>{" "}
-                  {appointment.reason}
-                </p>
+                      <td className="p-3">
+                        {appointment.appointment_date}
+                      </td>
 
-                <p className="mb-5">
-                  <strong>Status:</strong>{" "}
-                  {appointment.status || "pending"}
-                </p>
+                      <td className="p-3">
+                        {appointment.appointment_time}
+                      </td>
 
-                <button
-                  onClick={() =>
-                    updateStatus(
-                      appointment.id,
-                      "approved"
-                    )
-                  }
-                  className="mr-3 rounded-lg bg-green-600 px-5 py-2 font-semibold text-white hover:bg-green-700"
-                >
-                  Approve
-                </button>
+                      <td className="p-3">
+                        {appointment.reason}
+                      </td>
 
-                <button
-                  onClick={() =>
-                    updateStatus(
-                      appointment.id,
-                      "rejected"
-                    )
-                  }
-                  className="rounded-lg bg-red-600 px-5 py-2 font-semibold text-white hover:bg-red-700"
-                >
-                  Reject
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
+                      <td className="p-3 capitalize">
+                        {appointment.status}
+                      </td>
 
+                      <td className="p-3">
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() =>
+                              updateStatus(appointment.id, "approved")
+                            }
+                            className="bg-green-500 text-white px-3 py-1 rounded"
+                          >
+                            Approve
+                          </button>
+
+                          <button
+                            onClick={() =>
+                              updateStatus(appointment.id, "rejected")
+                            }
+                            className="bg-red-500 text-white px-3 py-1 rounded"
+                          >
+                            Reject
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </div>
-    </main>
+    </div>
   );
 }
